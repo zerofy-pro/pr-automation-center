@@ -16,7 +16,7 @@ jobs:
         with:
           app-id: ${{ secrets.ORG_APP_ID }}
           private-key: ${{ secrets.ORG_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
+          repositories: "pr-automation-center"
       
       - name: Checkout Control Tower Config
         uses: actions/checkout@v4
@@ -70,7 +70,7 @@ jobs:
         with:
           app-id: ${{ secrets.ORG_APP_ID }}
           private-key: ${{ secrets.ORG_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
+          repositories: "pr-automation-center"
 
       - name: Checkout Control Tower Config
         uses: actions/checkout@v4
