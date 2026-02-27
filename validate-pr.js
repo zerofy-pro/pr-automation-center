@@ -1,19 +1,19 @@
 const { 
   GITHUB_TOKEN, JIRA_TOKEN, JIRA_USER, JIRA_DOMAIN, 
-  PR_NUMBER, REPO_FULL_NAME, PR_TITLE, BRANCH_NAME, PR_BODY_INPUT 
+  PR_NUMBER, REPO_FULL_NAME, PR_BODY_INPUT
 } = process.env;
 
+// Fallbacks to prevent bash undefined errors
+const PR_TITLE = process.env.PR_TITLE || "";
+const BRANCH_NAME = process.env.BRANCH_NAME || "";
 const PR_BODY = PR_BODY_INPUT || "";
+
 const JIRA_MARKER_START = "";
 const JIRA_MARKER_END = "";
 
 async function run() {
   console.log(`Checking PR #${PR_NUMBER} in ${REPO_FULL_NAME}...`);
-  
-  // ADD THESE TWO LINES (They will not print your actual token/email)
-  console.log(`Debug - JIRA_USER length: ${JIRA_USER ? JIRA_USER.length : 'UNDEFINED'}`);
-  console.log(`Debug - JIRA_TOKEN length: ${JIRA_TOKEN ? JIRA_TOKEN.length : 'UNDEFINED'}`);
-  
+
   // 1. Extract Jira Keys
   const jiraRegex = /([A-Z]+-\d+)/g;
   const keys = new Set([
@@ -33,11 +33,14 @@ async function run() {
     process.exit(1);
   }
 
-  // 3. Fetch Jira Titles
+  // 3. Fetch Jira Titles (Strict Mode)
   let jiraList = "";
+  let validTicketCount = 0; // <--- This was the missing line causing the crash!
+  
   const authHeader = `Basic ${Buffer.from(`${JIRA_USER}:${JIRA_TOKEN}`).toString('base64')}`;
 
   for (const key of keys) {
+    console.log(`Checking Jira for ticket: ${key}...`);
     try {
       const res = await fetch(`https://${JIRA_DOMAIN}/rest/api/3/issue/${key}`, {
         headers: { 'Authorization': authHeader, 'Accept': 'application/json' }
@@ -46,38 +49,36 @@ async function run() {
       if (res.ok) {
         const data = await res.json();
         jiraList += `* [${key}](https://${JIRA_DOMAIN}/browse/${key}) - ${data.fields.summary}\n`;
-        console.log(`✅ Validated Jira ticket: ${key}`);
-        validTicketCount++; // Found a real one!
+        console.log(`✅ Validated real Jira ticket: ${key}`);
+        validTicketCount++;
       } else {
-        console.error(`⚠️ Jira returned HTTP ${res.status} for ${key}. Fake ticket or wrong permissions?`);
+        console.error(`⚠️ Jira returned HTTP ${res.status} for ${key}. Ticket might not exist or lacks permissions.`);
       }
     } catch (e) {
       console.error(`❌ Error connecting to Jira for ${key}:`, e.message);
     }
   }
 
-  // NEW: The Strict Enforcer
+  // If we checked all the keys and NONE of them were real, fail the CI.
   if (validTicketCount === 0) {
-    console.error("❌ FAILED: Could not validate any Jira tickets. Make sure the ticket actually exists in Jira!");
-    process.exit(1); // This instantly turns the CI Red
+    console.error("❌ STRICT FAILURE: Could not validate ANY of the provided Jira tickets. Ensure the ticket actually exists!");
+    process.exit(1); 
   }
 
-  // 4. Update PR Description (Non-destructive)
+  // 4. Update PR Description
   const infoBlock = `${JIRA_MARKER_START}\n### 🎫 Related Jira Tickets\n${jiraList}${JIRA_MARKER_END}`;
   let newBody = "";
 
   if (PR_BODY.includes(JIRA_MARKER_START)) {
-    // Replace existing block to keep it up-to-date
     const replaceRegex = new RegExp(`${JIRA_MARKER_START}[\\s\\S]*${JIRA_MARKER_END}`);
     newBody = PR_BODY.replace(replaceRegex, infoBlock);
   } else {
-    // Prepend to existing description
     newBody = `${infoBlock}\n\n${PR_BODY}`;
   }
 
   if (newBody !== PR_BODY) {
-    console.log("Updating PR description with Jira details...");
-    await fetch(`https://api.github.com/repos/${REPO_FULL_NAME}/pulls/${PR_NUMBER}`, {
+    console.log("Updating PR description with verified Jira details...");
+    const patchRes = await fetch(`https://api.github.com/repos/${REPO_FULL_NAME}/pulls/${PR_NUMBER}`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${GITHUB_TOKEN}`,
@@ -86,9 +87,13 @@ async function run() {
       },
       body: JSON.stringify({ body: newBody })
     });
+    
+    if (!patchRes.ok) {
+      console.error(`⚠️ Failed to update PR description: HTTP ${patchRes.status}`);
+    }
   }
   
-  console.log("✅ All PR standards met!");
+  console.log("✅ All PR standards met successfully!");
 }
 
 run().catch(err => { 
