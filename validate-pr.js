@@ -9,7 +9,11 @@ const JIRA_MARKER_END = "";
 
 async function run() {
   console.log(`Checking PR #${PR_NUMBER} in ${REPO_FULL_NAME}...`);
-
+  
+  // ADD THESE TWO LINES (They will not print your actual token/email)
+  console.log(`Debug - JIRA_USER length: ${JIRA_USER ? JIRA_USER.length : 'UNDEFINED'}`);
+  console.log(`Debug - JIRA_TOKEN length: ${JIRA_TOKEN ? JIRA_TOKEN.length : 'UNDEFINED'}`);
+  
   // 1. Extract Jira Keys
   const jiraRegex = /([A-Z]+-\d+)/g;
   const keys = new Set([
