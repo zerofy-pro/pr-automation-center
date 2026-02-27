@@ -31,7 +31,7 @@ async function run() {
 
   // 3. Fetch Jira Titles
   let jiraList = "";
-  const authHeader = `Bearer ${JIRA_TOKEN}`;
+  const authHeader = `Basic ${Buffer.from(`${JIRA_USER}:${JIRA_TOKEN}`).toString('base64')}`;
 
   for (const key of keys) {
     try {
