@@ -1,5 +1,5 @@
 const { 
-  GITHUB_TOKEN, JIRA_TOKEN, JIRA_DOMAIN, 
+  GITHUB_TOKEN, JIRA_TOKEN, JIRA_USER, JIRA_DOMAIN, 
   PR_NUMBER, REPO_FULL_NAME, PR_TITLE, BRANCH_NAME, PR_BODY_INPUT 
 } = process.env;
 
@@ -31,21 +31,31 @@ async function run() {
 
   // 3. Fetch Jira Titles
   let jiraList = "";
-  const authHeader = `Bearer ${JIRA_TOKEN}`;
+const authHeader = `Basic ${Buffer.from(`${JIRA_USER}:${JIRA_TOKEN}`).toString('base64')}`;
 
   for (const key of keys) {
     try {
       const res = await fetch(`https://${JIRA_DOMAIN}/rest/api/3/issue/${key}`, {
         headers: { 'Authorization': authHeader, 'Accept': 'application/json' }
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      jiraList += `* [${key}](https://${JIRA_DOMAIN}/browse/${key}) - ${data.fields.summary}\n`;
-      console.log(`✅ Found Jira ticket: ${key}`);
+      
+      if (res.ok) {
+        const data = await res.json();
+        jiraList += `* [${key}](https://${JIRA_DOMAIN}/browse/${key}) - ${data.fields.summary}\n`;
+        console.log(`✅ Validated Jira ticket: ${key}`);
+        validTicketCount++; // Found a real one!
+      } else {
+        console.error(`⚠️ Jira returned HTTP ${res.status} for ${key}. Fake ticket or wrong permissions?`);
+      }
     } catch (e) {
-      jiraList += `* ${key} (Could not fetch title from Jira)\n`;
-      console.log(`⚠️ Could not fetch data for ${key}`);
+      console.error(`❌ Error connecting to Jira for ${key}:`, e.message);
     }
+  }
+
+  // NEW: The Strict Enforcer
+  if (validTicketCount === 0) {
+    console.error("❌ FAILED: Could not validate any Jira tickets. Make sure the ticket actually exists in Jira!");
+    process.exit(1); // This instantly turns the CI Red
   }
 
   // 4. Update PR Description (Non-destructive)
