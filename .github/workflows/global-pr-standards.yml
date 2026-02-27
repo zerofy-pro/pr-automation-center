@@ -41,6 +41,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           JIRA_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_USER:  ${{ secrets.JIRA_TOKEN }}
           JIRA_DOMAIN: "payjustnow-team.atlassian.net"
           PR_TITLE: ${{ github.event.pull_request.title }}
           BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
