@@ -1,0 +1,99 @@
+name: "PR Standards Checker - Global"
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, closed]
+    branches: [main]
+
+jobs:
+  check-standards:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Generate App Token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.ORG_APP_ID }}
+          private-key: ${{ secrets.ORG_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+      
+      - name: Checkout Control Tower Config
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/pr-automation-center
+          path: automation-config
+          token: ${{ steps.generate-token.outputs.token }}
+
+      - name: Check Exclusion List
+        id: exclusion
+        run: |
+          if cat automation-config/excluded_repos.json | jq -r '.[]' | grep -q "^${{ github.event.repository.name }}$"; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Skipping compliance check for ${{ github.event.repository.name }}..."
+          fi
+
+      # 3. Run the Node.js Validation Script
+      - name: Enforce PR Standards
+        id: validator
+        if: steps.exclusion.outputs.skip != 'true' && github.event.action != 'closed'
+        continue-on-error: true # Crucial: Allows it to fail (Red CI) but keeps running so the merge button isn't blocked completely
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JIRA_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_DOMAIN: "ypayjustnow-team.atlassian.net"
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+          PR_BODY_INPUT: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO_FULL_NAME: ${{ github.repository }}
+        run: node automation-config/validate-pr.js
+
+      # 4. Fail the workflow explicitly if the script failed
+      - name: Set Check Status
+        if: steps.exclusion.outputs.skip != 'true' && github.event.action != 'closed' && steps.validator.outcome == 'failure'
+        run: |
+          echo "PR validation failed. Review the logs above."
+          exit 1 
+
+  slack-alert-on-merge:
+    runs-on: ubuntu-latest
+    needs: check-standards
+    # Run only if the PR was merged AND the previous run state was 'failure'
+    # Since GitHub creates a fresh run on 'closed', we actually check the PR labels or just fire if it lacks Jira formatting
+    if: github.event.pull_request.merged == true
+    steps:
+
+      - name: Generate App Token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.ORG_APP_ID }}
+          private-key: ${{ secrets.ORG_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Checkout Control Tower Config
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/pr-automation-center
+          path: automation-config
+          token: ${{ steps.generate-token.outputs.token }}
+
+      - name: Re-evaluate to see if it was merged while Red
+        id: final-check
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+        run: |
+          # A quick regex check to see if the merged PR met the standards
+          JIRA_REGEX="([A-Z]+-[0-9]+)"
+          if [[ ! "$PR_TITLE" =~ $JIRA_REGEX && ! "$BRANCH_NAME" =~ $JIRA_REGEX ]]; then
+             echo "failed=true" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Notify Slack
+        if: steps.final-check.outputs.failed == 'true'
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data '{"text":"🚨 *Standards Violation Alert*\nPR <${{ github.event.pull_request.html_url }}|#${{ github.event.pull_request.number }}> in `${{ github.repository }}` was merged into `main` by *${{ github.actor }}* without a Jira ticket!"}' \
+          ${{ secrets.SLACK_WEBHOOK_URL }}
