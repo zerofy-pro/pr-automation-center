@@ -7,11 +7,6 @@ jobs:
   check-standards:
     runs-on: ubuntu-latest
     if: github.event.action != 'closed'
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      statuses: write
-      pull-requests: read
     steps:
 
       - name: Generate App Token
@@ -95,8 +90,6 @@ jobs:
     # We remove 'needs: check-standards' so this job can run immediately when the PR is merged,
     # without waiting for the (now skipped) check-standards job.
     if: github.event.pull_request.merged == true
-    permissions:
-      contents: read
     steps:
 
       - name: Generate App Token
