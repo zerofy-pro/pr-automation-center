@@ -54,9 +54,14 @@ jobs:
       - name: Set Check Status
         if: steps.exclusion.outputs.skip != 'true' && github.event.action != 'closed' && steps.validator.outcome == 'failure'
         run: |
-          echo "::error title=Validation Failed::PR validation failed! Please fix Jira/Title issues."
-          echo "PR validation failed. Review the logs above."
-          exit 0 
+          echo "::error title=Validation Failed::This PR does not meet the global standards (Jira Ticket/Title). Please fix it."
+          echo "### ❌ PR Validation Failed" >> $GITHUB_STEP_SUMMARY
+          echo "This PR does not comply with the repository standards." >> $GITHUB_STEP_SUMMARY
+          echo "Please ensure the PR title or branch name contains a valid Jira ticket." >> $GITHUB_STEP_SUMMARY
+          
+          # We exit 0 (Success) so that the Global Ruleset/Branch Protection does NOT block the merge.
+          # The error annotation above will still alert the user visually.
+          exit 0
 
   slack-alert-on-merge:
     runs-on: ubuntu-latest
