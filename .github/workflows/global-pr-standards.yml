@@ -32,7 +32,7 @@ jobs:
         with:
           repository: ${{ github.repository_owner }}/pr-automation-center
           path: automation-config
-          token: ${{ steps.generate-token.outputs.token }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check Exclusion List
         id: exclusion
