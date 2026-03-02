@@ -1,8 +1,8 @@
 name: "PR Standards Checker - Global"
 
 on:
-  pull_request:
-    types: [opened, edited, unlabeled, reopened, closed]
+  pull_request_target:
+   types: [assigned, opened, synchronize, reopened]
 
 jobs:
   check-standards:
