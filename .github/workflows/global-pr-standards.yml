@@ -50,18 +50,40 @@ jobs:
           REPO_FULL_NAME: ${{ github.repository }}
         run: node automation-config/validate-pr.js
 
-      # 4. Fail the workflow explicitly if the script failed
-      - name: Set Check Status
-        if: steps.exclusion.outputs.skip != 'true' && github.event.action != 'closed' && steps.validator.outcome == 'failure'
+     # 4. Post Non-Blocking Status (Red Check, Green Merge)
+      - name: Report Compliance Status
+        if: steps.exclusion.outputs.skip != 'true' && github.event.action != 'closed'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "::error title=Validation Failed::This PR does not meet the global standards (Jira Ticket/Title). Please fix it."
-          echo "### ❌ PR Validation Failed" >> $GITHUB_STEP_SUMMARY
-          echo "This PR does not comply with the repository standards." >> $GITHUB_STEP_SUMMARY
-          echo "Please ensure the PR title or branch name contains a valid Jira ticket." >> $GITHUB_STEP_SUMMARY
+          # Determine Status
+          if [[ "${{ steps.validator.outcome }}" == "failure" ]]; then
+            STATE="failure"
+            DESC="❌ Missing/Invalid Jira Ticket"
+          else
+            STATE="success"
+            DESC="✅ Standards Met"
+          fi
           
-          # We exit 0 (Success) so that the Global Ruleset/Branch Protection does NOT block the merge.
-          # The error annotation above will still alert the user visually.
-          exit 0
+          # Create a SEPARATE commit status check.
+          # The main workflow stays Green (allowing merge).
+          # This new check becomes Red (visual warning).
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }} \
+            -f state="$STATE" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -f description="$DESC" \
+            -f context="Jira Compliance"
+
+          # Use error annotation for extra visibility if failed
+          if [[ "$STATE" == "failure" ]]; then
+             echo "::error title=Compliance Failed::PR failed Jira Compliance check. See 'Jira Compliance' status below."
+          fi
+          
+          exit 0 
 
   slack-alert-on-merge:
     runs-on: ubuntu-latest
