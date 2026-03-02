@@ -36,7 +36,7 @@ jobs:
       - name: Enforce PR Standards
         id: validator
         if: steps.exclusion.outputs.skip != 'true' && github.event.action != 'closed'
-        continue-on-error: true # Crucial: Allows it to fail (Red CI) but keeps running so the merge button isn't blocked completely
+        continue-on-error: true # Crucial: Alclows it to fail (Red CI) but keeps running so the merge button isn't blocked completely
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           JIRA_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
