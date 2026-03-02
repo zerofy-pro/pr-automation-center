@@ -3,7 +3,7 @@ name: "PR Standards Checker - Global"
 on:
   pull_request:
     types: [opened, edited, synchronize, closed]
-    branches: [main]
+  workflow_dispatch: 
 
 jobs:
   check-standards:
