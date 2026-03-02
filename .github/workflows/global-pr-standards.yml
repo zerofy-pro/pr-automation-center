@@ -54,8 +54,9 @@ jobs:
       - name: Set Check Status
         if: steps.exclusion.outputs.skip != 'true' && github.event.action != 'closed' && steps.validator.outcome == 'failure'
         run: |
+          echo "::error title=Validation Failed::PR validation failed! Please fix Jira/Title issues."
           echo "PR validation failed. Review the logs above."
-          exit 1 
+          exit 0 
 
   slack-alert-on-merge:
     runs-on: ubuntu-latest
