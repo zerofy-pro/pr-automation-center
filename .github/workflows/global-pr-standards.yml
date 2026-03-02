@@ -35,7 +35,7 @@ jobs:
         with:
           repository: ${{ github.repository_owner }}/pr-automation-center
           path: automation-config
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.generate-token.outputs.token }}
 
       - name: Check Exclusion List
         id: exclusion
@@ -66,7 +66,7 @@ jobs:
       - name: Report Compliance Status
         if: steps.exclusion.outputs.skip != 'true' && github.event.action != 'closed'
         env:
-          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Determine Status
           if [[ "${{ steps.validator.outcome }}" == "failure" ]]; then
