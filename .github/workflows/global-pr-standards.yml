@@ -2,18 +2,10 @@ name: "PR Standards Checker - Global"
 
 on:
   pull_request:
-    types: [opened, edited, unlabeled, reopened, closed]
-    branches: [main]
-  pull_request_target:
-   types: [assigned, opened, synchronize, reopened]
-  workflow_dispatch:      # Manual trigger
-  workflow_call:          # Allows this to be used as a Reusable Workflow (bypass Ruleset limitation)
 
 jobs:
   check-standards:
     runs-on: ubuntu-latest
-    # Run on all events EXCEPT 'closed' (merge/close). 
-    # This prevents the validation from running meaninglessly during the merge event.
     if: github.event.action != 'closed'
     timeout-minutes: 10
     permissions:
