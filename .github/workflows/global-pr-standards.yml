@@ -2,7 +2,10 @@ name: "PR Standards Checker - Global"
 
 on:
   pull_request:
-    types: [opened, edited, synchronize, reopened, closed]
+    types: [opened, edited, unlabeled, reopened, closed]
+    branches: [main]
+  pull_request_target:
+   types: [assigned, opened, synchronize, reopened]
   workflow_dispatch:      # Manual trigger
   workflow_call:          # Allows this to be used as a Reusable Workflow (bypass Ruleset limitation)
 
