@@ -2,11 +2,21 @@ name: "PR Standards Checker - Global"
 
 on:
   pull_request:
-    types: [opened, edited, unlabeled]
+    types: [opened, edited, synchronize, reopened, closed]
+  workflow_dispatch:      # Manual trigger
+  workflow_call:          # Allows this to be used as a Reusable Workflow (bypass Ruleset limitation)
 
 jobs:
   check-standards:
     runs-on: ubuntu-latest
+    # Run on all events EXCEPT 'closed' (merge/close). 
+    # This prevents the validation from running meaninglessly during the merge event.
+    if: github.event.action != 'closed'
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      statuses: write
+      pull-requests: read
     steps:
 
       - name: Generate App Token
@@ -49,11 +59,11 @@ jobs:
           REPO_FULL_NAME: ${{ github.repository }}
         run: node automation-config/validate-pr.js
 
-     # 4. Post Non-Blocking Status (Red Check, Green Merge)
+      # 4. Post Non-Blocking Status (Red Check, Green Merge)
       - name: Report Compliance Status
         if: steps.exclusion.outputs.skip != 'true' && github.event.action != 'closed'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
         run: |
           # Determine Status
           if [[ "${{ steps.validator.outcome }}" == "failure" ]]; then
@@ -86,10 +96,12 @@ jobs:
 
   slack-alert-on-merge:
     runs-on: ubuntu-latest
-    needs: check-standards
-    # Run only if the PR was merged AND the previous run state was 'failure'
-    # Since GitHub creates a fresh run on 'closed', we actually check the PR labels or just fire if it lacks Jira formatting
+    # Run only on merge.
+    # We remove 'needs: check-standards' so this job can run immediately when the PR is merged,
+    # without waiting for the (now skipped) check-standards job.
     if: github.event.pull_request.merged == true
+    permissions:
+      contents: read
     steps:
 
       - name: Generate App Token
@@ -125,3 +137,4 @@ jobs:
           curl -X POST -H 'Content-type: application/json' \
           --data '{"text":"🚨 *Standards Violation Alert*\nPR <${{ github.event.pull_request.html_url }}|#${{ github.event.pull_request.number }}> in `${{ github.repository }}` was merged into `main` by *${{ github.actor }}* without a Jira ticket!"}' \
           ${{ secrets.SLACK_WEBHOOK_URL }}
+
