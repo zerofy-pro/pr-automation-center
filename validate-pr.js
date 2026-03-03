@@ -44,7 +44,7 @@ async function run() {
 
   // 3. Fetch Jira Titles (Strict Mode)
   // Initialize Markdown Table Header
-  let jiraList = "> | Ticket | Type | Status | Summary |\n> |:---:|:---:|:---:|:---|\n";
+  let jiraList = "> | Ticket | Type | Summary |\n> |:---:|:---:|:---|\n";
   let validTicketCount = 0; 
   
   const authHeader = `Basic ${Buffer.from(`${JIRA_USER}:${JIRA_TOKEN}`).toString('base64')}`;
@@ -63,7 +63,7 @@ async function run() {
         const type = f.issuetype ? f.issuetype.name : "Task";
         const summary = (f.summary || "No Summary").replace(/\|/g, '-'); // Escape pipes for table
 
-        jiraList += `> | [${key}](https://${JIRA_DOMAIN}/browse/${key}) | ${type} | ${status} | ${summary} |\n`;
+        jiraList += `> | [${key}](https://${JIRA_DOMAIN}/browse/${key}) | ${type} | ${summary} |\n`;
         console.log(`✅ Validated real Jira ticket: ${key}`);
         validTicketCount++;
       } else {
