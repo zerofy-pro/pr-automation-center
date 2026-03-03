@@ -35,7 +35,7 @@ async function run() {
 
   // 3. Fetch Jira Titles (Strict Mode)
   // Initialize Markdown Table Header
-  let jiraList = "> | Ticket | Type | Status | Summary |\n|:---:|:---:|:---:|:---|\n";
+  let jiraList = "> | Ticket | Type | Status | Summary |\n> |:---:|:---:|:---:|:---|\n";
   let validTicketCount = 0; 
   
   const authHeader = `Basic ${Buffer.from(`${JIRA_USER}:${JIRA_TOKEN}`).toString('base64')}`;
@@ -77,7 +77,7 @@ async function run() {
     return;
   }
 
-  const infoBlock = `${JIRA_MARKER_START}\n>[!NOTE]\n>### 🎫 Related Jira Tickets\n>${jiraList}${JIRA_MARKER_END}`;
+  const infoBlock = `${JIRA_MARKER_START}\n>[!NOTE]\n>### 🎫 Related Jira Tickets\n${jiraList}${JIRA_MARKER_END}`;
   let newBody = "";
 
   if (PR_BODY.includes(JIRA_MARKER_START)) {
