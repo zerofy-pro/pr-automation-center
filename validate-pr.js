@@ -16,13 +16,22 @@ async function run() {
 
   // 1. Extract Jira Keys
   const jiraRegex = /([A-Z]+-\d+)/g;
+
+  // Clean the body to remove the automated Jira block so we don't re-scan our own table
+  let cleanBody = PR_BODY;
+  if (PR_BODY.includes(JIRA_MARKER_START) && PR_BODY.includes(JIRA_MARKER_END)) {
+     const removeRegex = new RegExp(`${JIRA_MARKER_START}[\\s\\S]*?${JIRA_MARKER_END}`, 'g');
+     cleanBody = PR_BODY.replace(removeRegex, '');
+  }
+
   const keys = new Set([
     ...(PR_TITLE.match(jiraRegex) || []),
-    ...(BRANCH_NAME.match(jiraRegex) || [])
+    ...(BRANCH_NAME.match(jiraRegex) || []),
+    ...(cleanBody.match(jiraRegex) || [])
   ]);
 
   if (keys.size === 0) {
-    console.error("❌ No Jira ticket key found in title or branch name.");
+    console.error("❌ No Jira ticket key found in title, branch name, or description.");
     process.exit(1);
   }
 
