@@ -8,8 +8,8 @@ const PR_TITLE = process.env.PR_TITLE || "";
 const BRANCH_NAME = process.env.BRANCH_NAME || "";
 const PR_BODY = PR_BODY_INPUT || "";
 
-const JIRA_MARKER_START = "";
-const JIRA_MARKER_END = "";
+const JIRA_MARKER_START = "<!-- JIRA-INFO-START -->";
+const JIRA_MARKER_END = "<!-- JIRA-INFO-END -->";
 
 async function run() {
   console.log(`Checking PR #${PR_NUMBER} in ${REPO_FULL_NAME}...`);
@@ -34,8 +34,9 @@ async function run() {
   }
 
   // 3. Fetch Jira Titles (Strict Mode)
-  let jiraList = "";
-  let validTicketCount = 0; // <--- This was the missing line causing the crash!
+  // Initialize Markdown Table Header
+  let jiraList = "| Ticket | Type | Status | Summary |\n|:---:|:---:|:---:|:---|\n";
+  let validTicketCount = 0; 
   
   const authHeader = `Basic ${Buffer.from(`${JIRA_USER}:${JIRA_TOKEN}`).toString('base64')}`;
 
@@ -48,7 +49,12 @@ async function run() {
       
       if (res.ok) {
         const data = await res.json();
-        jiraList += `* [${key}](https://${JIRA_DOMAIN}/browse/${key}) - ${data.fields.summary}\n`;
+        const f = data.fields;
+        const status = f.status ? f.status.name.toUpperCase() : "UNKNOWN";
+        const type = f.issuetype ? f.issuetype.name : "Task";
+        const summary = (f.summary || "No Summary").replace(/\|/g, '-'); // Escape pipes for table
+
+        jiraList += `| [${key}](https://${JIRA_DOMAIN}/browse/${key}) | ${type} | ${status} | ${summary} |\n`;
         console.log(`✅ Validated real Jira ticket: ${key}`);
         validTicketCount++;
       } else {
@@ -65,14 +71,21 @@ async function run() {
     process.exit(1); 
   }
 
-  // 4. Update PR Description
+  // 4. Update PR Description (Optional)
+  if (process.env.SKIP_UPDATE === 'true') {
+    console.log("ℹ️ Skipping PR description update as per configuration.");
+    return;
+  }
+
   const infoBlock = `${JIRA_MARKER_START}\n### 🎫 Related Jira Tickets\n${jiraList}${JIRA_MARKER_END}`;
   let newBody = "";
 
   if (PR_BODY.includes(JIRA_MARKER_START)) {
-    const replaceRegex = new RegExp(`${JIRA_MARKER_START}[\\s\\S]*${JIRA_MARKER_END}`);
+    // Replace existing block
+    const replaceRegex = new RegExp(`${JIRA_MARKER_START}[\\s\\S]*?${JIRA_MARKER_END}`);
     newBody = PR_BODY.replace(replaceRegex, infoBlock);
   } else {
+    // Append block at the top, preserving original description
     newBody = `${infoBlock}\n\n${PR_BODY}`;
   }
 
